@@ -9,6 +9,7 @@ use Context;
 use Goal;
 use Z3_MUTEX;
 
+
 impl<'ctx> Goal<'ctx> {
     pub fn new_from_z3_type(ctx: &'ctx Context, z3_goal: Z3_goal) -> Goal<'ctx>{
         Goal {
@@ -21,6 +22,7 @@ impl<'ctx> Goal<'ctx> {
         let goal = Self {
             ctx,
             z3_goal: unsafe {
+                let guard = Z3_MUTEX.lock().unwrap();
                 let g = Z3_mk_goal(ctx.z3_ctx, models, unsat_cores, proofs);
                 Z3_goal_inc_ref(ctx.z3_ctx, g);
                 g
@@ -32,6 +34,7 @@ impl<'ctx> Goal<'ctx> {
     /// Add a new formula `a` to the given goal.
     pub fn assert(&self, ast: &impl ast::Ast<'ctx>) {
         unsafe {
+            let guard = Z3_MUTEX.lock().unwrap();
             Z3_goal_assert(self.ctx.z3_ctx, self.z3_goal, ast.get_z3_ast())
         }
     }
@@ -39,6 +42,7 @@ impl<'ctx> Goal<'ctx> {
     /// Return true if the given goal contains the formula `false`.
     pub fn is_inconsistent(&self) -> bool {
         unsafe {
+            let guard = Z3_MUTEX.lock().unwrap();
             Z3_goal_inconsistent(self.ctx.z3_ctx, self.z3_goal)
         }
     }
@@ -46,6 +50,7 @@ impl<'ctx> Goal<'ctx> {
     /// Return the depth of the given goal. It tracks how many transformations were applied to it.
     pub fn get_depth(&self) -> u32 {
         unsafe {
+            let guard = Z3_MUTEX.lock().unwrap();
             Z3_goal_depth(self.ctx.z3_ctx, self.z3_goal)
         }
     }
@@ -53,6 +58,7 @@ impl<'ctx> Goal<'ctx> {
     /// Return the number of formulas in the given goal.
     pub fn get_size(&self) -> u32 {
         unsafe {
+            let guard = Z3_MUTEX.lock().unwrap();
             Z3_goal_size(self.ctx.z3_ctx, self.z3_goal)
         }
     }
@@ -60,6 +66,7 @@ impl<'ctx> Goal<'ctx> {
     /// Return the number of formulas, subformulas and terms in the given goal.
     pub fn get_num_expr(&self) -> u32 {
         unsafe {
+            let guard = Z3_MUTEX.lock().unwrap();
             Z3_goal_num_exprs(self.ctx.z3_ctx, self.z3_goal)
         }
     }
@@ -67,12 +74,14 @@ impl<'ctx> Goal<'ctx> {
     /// Return true if the goal is empty, and it is precise or the product of a under approximation.
     pub fn is_decided_sat(&self) -> bool {
         unsafe {
+            let guard = Z3_MUTEX.lock().unwrap();
             Z3_goal_is_decided_sat(self.ctx.z3_ctx, self.z3_goal)
         }
     }
     /// Return true if the goal contains false, and it is precise or the product of an over approximation.
     pub fn is_decided_unsat(&self) -> bool {
         unsafe {
+            let guard = Z3_MUTEX.lock().unwrap();
             Z3_goal_is_decided_unsat(self.ctx.z3_ctx, self.z3_goal)
         }
     }
@@ -80,6 +89,7 @@ impl<'ctx> Goal<'ctx> {
     /// Erase all formulas from the given goal.
     pub fn reset(&self) {
         unsafe {
+            let guard = Z3_MUTEX.lock().unwrap();
             Z3_goal_reset(self.ctx.z3_ctx, self.z3_goal)
         };
     }
@@ -89,20 +99,17 @@ impl<'ctx> Goal<'ctx> {
         Goal {
             ctx,
             z3_goal: unsafe {
+                let guard = Z3_MUTEX.lock().unwrap();
                 Z3_goal_translate(self.ctx.z3_ctx, self.z3_goal, ctx.z3_ctx)
             }
         }
     }
 
     /// Return the "precision" of the given goal. Goals can be transformed using over and under approximations.
-    pub fn get_precision(&self) -> String {
-        match unsafe {
+    pub fn get_precision(&self) -> GoalPrec {
+        let guard = Z3_MUTEX.lock().unwrap();
+        unsafe {
             Z3_goal_precision(self.ctx.z3_ctx, self.z3_goal)
-        } {
-            GoalPrec::Precise => "PRECISE".to_string(),
-            GoalPrec::Under => "UNDER".to_string(),
-            GoalPrec::Over => "OVER".to_string(),
-            GoalPrec::UnderOver => "UNDEROVER".to_string(),
         }
     }
 
@@ -110,12 +117,14 @@ impl<'ctx> Goal<'ctx> {
     pub fn get_formulas<T>(&self) -> Vec<T> where T: Ast<'ctx> {
         let goal_size = self.get_size();
         let formula = unsafe {
+            let guard = Z3_MUTEX.lock().unwrap();
             Z3_goal_formula(self.ctx.z3_ctx, self.z3_goal, 0)
         };
         let mut formulas = vec![T::new(&self.ctx, formula)];
 
         for i in 1..goal_size {
             let formula = unsafe {
+                let guard = Z3_MUTEX.lock().unwrap();
                 Z3_goal_formula(self.ctx.z3_ctx, self.z3_goal, i)
             };
             formulas.push(T::new(&self.ctx, formula));

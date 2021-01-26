@@ -17,6 +17,7 @@ extern crate num;
 use std::ffi::CString;
 use std::sync::Mutex;
 use z3_sys::*;
+pub use z3_sys::GoalPrec;
 
 pub mod ast;
 mod config;

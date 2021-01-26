@@ -811,7 +811,7 @@ fn test_goal_get_precision() {
 
     let goal = Goal::new(&ctx, false, false, false);
     goal.assert(&false_bool);
-    assert_eq!(goal.get_precision(), "PRECISE".to_string());
+    assert_eq!(goal.get_precision(), z3::GoalPrec::Precise);
 }
 
 #[test]

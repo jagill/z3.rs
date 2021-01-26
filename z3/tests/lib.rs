@@ -868,7 +868,7 @@ fn test_goal_get_formulas_empty() {
     let ctx = Context::new(&cfg);
 
     let goal = Goal::new(&ctx, false, false, false);
-    goal.get_formulas();
+    goal.get_formulas::<Bool>();
 }
 
 #[test]
@@ -884,7 +884,7 @@ fn test_goal_get_formulas() {
     goal.assert(&b);
     goal.assert(&c);
     assert_eq!(
-        goal.get_formulas().iter().map(|x| x.as_bool().unwrap()).collect::<Vec<Bool>>(),
+        goal.get_formulas::<Bool>(),
         vec![a, b, c],
     );
 }
@@ -905,7 +905,7 @@ fn test_tactic_skip() {
     let tactic = Tactic::create_skip(&ctx);
     let goal_result = tactic.apply(&goal, &params);
     assert_eq!(
-        goal_result.get_formulas().iter().map(|x| x.as_bool().unwrap()).collect::<Vec<Bool>>(),
+        goal_result.get_formulas::<Bool>(),
         vec![a.clone(), b, a],
     );
 }
@@ -926,7 +926,7 @@ fn test_tactic_and_then() {
     let tactic = Tactic::new(&ctx, "sat-preprocess");
     let and_then_tactic = tactic.and_then(Tactic::new(&ctx, "simplify"));
     let goal_result = and_then_tactic.apply(&goal, &params);
-    assert_eq!(goal_result.get_formulas().iter().map(|x| x.as_bool().unwrap()).collect::<Vec<Bool>>(), vec![a, b]);
+    assert_eq!(goal_result.get_formulas::<Bool>(), vec![a, b]);
 }
 
 #[test]
@@ -945,22 +945,23 @@ fn test_tactic_or_else() {
     let tactic = Tactic::new(&ctx, "sat-preprocess");
     let or_else_tactic = tactic.or_else(Tactic::new(&ctx, "simplify"));
     let goal_result = or_else_tactic.apply(&goal, &params);
-    assert_eq!(goal_result.get_formulas().iter().map(|x| x.as_bool().unwrap()).collect::<Vec<Bool>>(), vec![a, b]);
+    assert_eq!(goal_result.get_formulas::<Bool>(), vec![a, b]);
 }
+
 
 #[test]
 fn test_goal_apply_tactic() {
     let cfg = Config::new();
     let ctx = Context::new(&cfg);
 
-    pub fn test_apply_tactic(ctx: &Context, goal: Goal, before_string: &str, after_string: &str) {
-        assert_eq!(format!("{}", goal), before_string);
+    pub fn test_apply_tactic(ctx: &Context, goal: Goal, before_formulas: Vec<Bool>, after_formulas: Vec<Bool>) {
+        assert_eq!(goal.get_formulas::<Bool>(), before_formulas);
         let params = Params::new(&ctx);
 
         let tactic = Tactic::new(&ctx, "ctx-solver-simplify");
         let repeat_tactic = Tactic::repeat(&ctx, tactic, 100);
         let goal_result = repeat_tactic.apply(&goal, &params);
-        assert_eq!(format!("{}", goal_result), after_string);
+        assert_eq!(goal_result.get_formulas::<Bool>(), after_formulas);
     }
 
     let a = ast::Bool::new_const(&ctx, "a");
@@ -970,24 +971,24 @@ fn test_goal_apply_tactic() {
     let a_and_b_and_a = Bool::and(&ctx, &bools);
     let goal = Goal::new(&ctx, false, false, false);
     goal.assert(&a_and_b_and_a);
-    test_apply_tactic(&ctx, goal, "(goal\n  a\n  b\n  a)", "(goal\n  b\n  a)");
+    test_apply_tactic(&ctx, goal, vec![a.clone(), b.clone(), a.clone()], vec![b.clone(), a.clone()]);
 
     let a_implies_b = ast::Bool::implies(&a, &b);
     let a_and_a_implies_b = Bool::and(&ctx, &[&a, &a_implies_b]);
 
     let goal = Goal::new(&ctx, false, false, false);
     goal.assert(&a_and_a_implies_b);
-    test_apply_tactic(&ctx, goal, "(goal\n  a\n  (=> a b))", "(goal\n  a\n  b)");
+    test_apply_tactic(&ctx, goal, vec![a.clone(), a_implies_b.clone()], vec![a.clone(), b.clone()]);
 
     let goal = Goal::new(&ctx, false, false, false);
     goal.assert(&a);
-    goal.assert(&a_implies_b);
-    test_apply_tactic(&ctx, goal, "(goal\n  a\n  (=> a b))", "(goal\n  a\n  b)");
+    goal.assert(&a_implies_b.clone());
+    test_apply_tactic(&ctx, goal, vec![a.clone(), a_implies_b.clone()], vec![a.clone(), b.clone()]);
 
     let true_bool = ast::Bool::from_bool(&ctx, true);
     let false_bool = ast::Bool::from_bool(&ctx, false);
     let goal = Goal::new(&ctx, false, false, false);
     let true_and_false_and_true = ast::Bool::and(&ctx, &[&true_bool, &false_bool, &true_bool]);
     goal.assert(&true_and_false_and_true);
-    test_apply_tactic(&ctx, goal, "(goal\n  false)", "(goal\n  false)");
+    test_apply_tactic(&ctx, goal, vec![false_bool.clone()], vec![false_bool.clone()]);
 }
